@@ -6,6 +6,14 @@ import galaxyraiders.ports.ui.Controller
 import galaxyraiders.ports.ui.Controller.PlayerCommand
 import galaxyraiders.ports.ui.Visualizer
 import kotlin.system.measureTimeMillis
+import java.io.File 
+import java.nio.file.Paths
+import kotlin.collections.List
+import com.beust.klaxon.Klaxon
+import com.beust.klaxon.JsonArray
+import com.beust.klaxon.JsonObject
+import java.time.Instant
+import java.io.StringReader
 
 const val MILLISECONDS_PER_SECOND: Int = 1000
 
@@ -33,9 +41,34 @@ class GameEngine(
     generator = generator
   )
 
+  var score = Score()
+  var timestamp = Instant.now().toString()
+  var scoreboardFile = File("src/main/kotlin/galaxyraiders/core/score/Scoreboard.json")
+  var leaderboardFile = File("src/main/kotlin/galaxyraiders/core/score/Leaderboard.json")
+  var scoreboardJson = JsonObject()
+  var leaderboardJson = JsonObject()
+
   var playing = true
 
   fun execute() {
+    if (!scoreboardFile.exists()) {
+      scoreboardFile.createNewFile()
+    }
+    if (scoreboardFile.readText().isEmpty()) {
+      scoreboardFile.writeText("{}")
+    }
+    this.scoreboardJson = Klaxon().parseJsonObject(this.scoreboardFile.reader())
+
+    if (!leaderboardFile.exists()) {
+      leaderboardFile.createNewFile()
+    }
+    if (leaderboardFile.readText().isEmpty()) {
+      leaderboardFile.writeText("{}")
+    }
+    this.leaderboardJson = Klaxon().parseJsonObject(this.leaderboardFile.reader())
+
+    updateScores()
+
     while (true) {
       val duration = measureTimeMillis { this.tick() }
 
@@ -93,11 +126,28 @@ class GameEngine(
     first.collideWith(second, GameEngineConfig.coefficientRestitution)
     if (first is Missile && second is Asteroid) {
       this.field.addExplosion(first, second)
+      this.score.addScore(second.radius, second.mass)
+      updateScores()
       return
     }
     if (first is Asteroid && second is Missile) {
       this.field.addExplosion(second, first)
+      this.score.addScore(first.radius, first.mass)
+      updateScores()
+      return
     }
+  }
+
+  fun updateScores () {
+    this.scoreboardJson[this.timestamp] = Klaxon().parseJsonObject(StringReader(this.score.getJSON())) 
+    this.scoreboardFile.writeText(this.scoreboardJson.toJsonString(prettyPrint = true))
+
+    val sorted = this.scoreboardJson.toSortedMap(compareByDescending { this.scoreboardJson.obj(it)?.int("score") })
+    val top3 = sorted.toList().take(3)
+    this.leaderboardJson.clear()
+    this.leaderboardJson.putAll(top3)
+    this.leaderboardFile.writeText(this.leaderboardJson.toJsonString(prettyPrint = true))
+
   }
 
   fun moveSpaceObjects() {
