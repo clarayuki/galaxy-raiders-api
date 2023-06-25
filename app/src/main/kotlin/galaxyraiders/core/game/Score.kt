@@ -7,8 +7,7 @@ class Score(var score: Int = 0, var destroyedAsteroids: Int = 0) {
     this.destroyedAsteroids += 1
   }
 
-  fun getJSON() : String {
+  fun getJSON(): String {
     return "{\"score\": ${this.score}, \"destroyedAsteroids\": ${this.destroyedAsteroids}}"
   }
-
 }

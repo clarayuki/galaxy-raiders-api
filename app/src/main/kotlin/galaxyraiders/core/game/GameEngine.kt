@@ -1,21 +1,20 @@
 package galaxyraiders.core.game
 
+import com.beust.klaxon.JsonObject
+import com.beust.klaxon.Klaxon
 import galaxyraiders.Config
 import galaxyraiders.ports.RandomGenerator
 import galaxyraiders.ports.ui.Controller
 import galaxyraiders.ports.ui.Controller.PlayerCommand
 import galaxyraiders.ports.ui.Visualizer
-import kotlin.system.measureTimeMillis
-import java.io.File 
-import java.nio.file.Paths
-import kotlin.collections.List
-import com.beust.klaxon.Klaxon
-import com.beust.klaxon.JsonArray
-import com.beust.klaxon.JsonObject
-import java.time.Instant
+import java.io.File
 import java.io.StringReader
+import java.time.Instant
+import kotlin.collections.List
+import kotlin.system.measureTimeMillis
 
 const val MILLISECONDS_PER_SECOND: Int = 1000
+const val LEADERBOARD_SIZE: Int = 3
 
 object GameEngineConfig {
   private val config = Config(prefix = "GR__CORE__GAME__GAME_ENGINE__")
@@ -121,7 +120,7 @@ class GameEngine(
     this.field.spaceObjects.forEachPair { (first, second) -> checkCollision(first, second) }
   }
 
-  fun checkCollision (first: SpaceObject, second: SpaceObject) {
+  fun checkCollision(first: SpaceObject, second: SpaceObject) {
     if (!first.impacts(second)) return
     first.collideWith(second, GameEngineConfig.coefficientRestitution)
     if (first is Missile && second is Asteroid) {
@@ -134,20 +133,18 @@ class GameEngine(
       this.field.addExplosion(second, first)
       this.score.addScore(first.radius, first.mass)
       updateScores()
-      return
     }
   }
 
-  fun updateScores () {
-    this.scoreboardJson[this.timestamp] = Klaxon().parseJsonObject(StringReader(this.score.getJSON())) 
+  fun updateScores() {
+    this.scoreboardJson[this.timestamp] = Klaxon().parseJsonObject(StringReader(this.score.getJSON()))
     this.scoreboardFile.writeText(this.scoreboardJson.toJsonString(prettyPrint = true))
 
     val sorted = this.scoreboardJson.toSortedMap(compareByDescending { this.scoreboardJson.obj(it)?.int("score") })
-    val top3 = sorted.toList().take(3)
+    val top3 = sorted.toList().take(LEADERBOARD_SIZE)
     this.leaderboardJson.clear()
     this.leaderboardJson.putAll(top3)
     this.leaderboardFile.writeText(this.leaderboardJson.toJsonString(prettyPrint = true))
-
   }
 
   fun moveSpaceObjects() {
